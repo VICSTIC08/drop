@@ -57,6 +57,10 @@ class ReservationStrategy:
         """Take one unit out of stock. Return False if there is none left."""
         raise NotImplementedError
 
+    async def on_drop_created(self, drop_id: UUID, total_units: int) -> None:
+        """Called once after a drop using this strategy is created. Most need nothing."""
+        return None
+
 
 async def create_hold(conn: AsyncConnection, drop_id: UUID, user_id: UUID) -> ReserveResult:
     """Insert the hold row. The expiry uses the database clock, never the app's clock."""

@@ -3,10 +3,10 @@
 import pytest
 
 from conftest import user_headers
-from drop.strategies import STRATEGIES
+from drop.strategies import STRATEGY_NAMES
 from drop.verify import verify_drop
 
-ALL = sorted(STRATEGIES)
+ALL = sorted(STRATEGY_NAMES)
 
 
 @pytest.mark.parametrize("strategy", ALL)

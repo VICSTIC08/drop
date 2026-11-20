@@ -18,7 +18,7 @@ from httpx import ASGITransport, AsyncClient
 
 from drop import config
 from drop.main import create_app
-from drop.strategies import STRATEGIES
+from drop.strategies import STRATEGY_NAMES
 from drop.verify import verify_drop
 
 
@@ -44,7 +44,7 @@ async def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--units", type=int, default=100)
     parser.add_argument("--buyers", type=int, default=1000)
-    parser.add_argument("strategies", nargs="*", default=sorted(STRATEGIES))
+    parser.add_argument("strategies", nargs="*", default=sorted(STRATEGY_NAMES))
     args = parser.parse_args()
 
     url = config.database_url()

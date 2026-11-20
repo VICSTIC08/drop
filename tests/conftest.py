@@ -5,6 +5,7 @@ from uuid import uuid4
 
 import psycopg
 import pytest
+import redis
 from httpx import ASGITransport, AsyncClient
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
@@ -16,6 +17,9 @@ from drop.migrate import migrate
 TEST_DATABASE_URL = os.environ.get(
     "TEST_DATABASE_URL", "postgresql://drop:drop@localhost:5432/drop_test"
 )
+# Tests use Redis database 1 so they never touch the development data in database 0.
+TEST_REDIS_URL = os.environ.get("TEST_REDIS_URL", "redis://localhost:6379/1")
+os.environ["REDIS_URL"] = TEST_REDIS_URL
 
 
 def _ensure_database_exists(url: str) -> None:
@@ -46,6 +50,14 @@ def db(database_url):
         yield conn
 
 
+@pytest.fixture
+def cache(db):
+    """A direct Redis connection for assertions, emptied before the test."""
+    with redis.Redis.from_url(TEST_REDIS_URL, decode_responses=True) as client:
+        client.flushdb()
+        yield client
+
+
 @pytest.fixture(autouse=True)
 def no_leftover_failpoints():
     yield
@@ -53,8 +65,8 @@ def no_leftover_failpoints():
 
 
 @pytest.fixture
-async def client(database_url, db):
-    app = create_app(database_url)
+async def client(database_url, db, cache):
+    app = create_app(database_url, TEST_REDIS_URL)
     async with app.router.lifespan_context(app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as c:

@@ -10,8 +10,10 @@ from dataclasses import dataclass, field
 from uuid import UUID
 
 import psycopg
+import redis
 
-from drop.config import database_url
+from drop.config import database_url, redis_url
+from drop.strategies.redis_counter import stock_key
 
 LIVE = ("active", "confirmed")
 
@@ -40,6 +42,7 @@ def verify_drop(conn: psycopg.Connection, drop_id: UUID | str) -> VerifyReport:
     row = conn.execute(
         """
         SELECT
+            d.strategy,
             d.total_units,
             c.available,
             (SELECT count(*) FROM holds h
@@ -60,7 +63,9 @@ def verify_drop(conn: psycopg.Connection, drop_id: UUID | str) -> VerifyReport:
     ).fetchone()
     if row is None:
         raise LookupError(f"drop not found: {drop_id}")
-    total_units, available, live_holds, confirmed_holds, orders, duplicate_buyers = row
+    strategy, total_units, available, live_holds, confirmed_holds, orders, duplicate_buyers = row
+    if strategy == "redis_counter":
+        available = _redis_stock(drop_id)
 
     report = VerifyReport(
         drop_id=str(drop_id),
@@ -88,6 +93,13 @@ def verify_drop(conn: psycopg.Connection, drop_id: UUID | str) -> VerifyReport:
             f"I4 orders: {confirmed_holds} confirmed holds but {orders} orders"
         )
     return report
+
+
+def _redis_stock(drop_id: UUID | str) -> int:
+    """For the Redis strategy the stock number lives in Redis, not in Postgres."""
+    with redis.Redis.from_url(redis_url(), decode_responses=True) as client:
+        value = client.get(stock_key(drop_id))
+    return int(value) if value is not None else 0
 
 
 def main() -> None:
