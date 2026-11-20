@@ -1,4 +1,6 @@
+import asyncio
 import os
+from collections import Counter
 from uuid import uuid4
 
 import psycopg
@@ -7,6 +9,7 @@ from httpx import ASGITransport, AsyncClient
 from psycopg import sql
 from psycopg.conninfo import conninfo_to_dict, make_conninfo
 
+from drop import failpoints
 from drop.main import create_app
 from drop.migrate import migrate
 
@@ -39,8 +42,14 @@ def database_url() -> str:
 def db(database_url):
     """A direct connection for assertions, with every table emptied before the test."""
     with psycopg.connect(database_url, autocommit=True) as conn:
-        conn.execute("TRUNCATE holds, inventory_counters, drops CASCADE")
+        conn.execute("TRUNCATE orders, holds, inventory_counters, drops CASCADE")
         yield conn
+
+
+@pytest.fixture(autouse=True)
+def no_leftover_failpoints():
+    yield
+    failpoints.clear()
 
 
 @pytest.fixture
@@ -63,5 +72,21 @@ def make_drop(client):
     return _make
 
 
-def user_headers() -> dict[str, str]:
-    return {"X-User-Id": str(uuid4())}
+@pytest.fixture
+def stampede(client):
+    """Fire many reservation requests at the same instant, each from a different buyer."""
+
+    async def _stampede(drop_id: str, buyers: int) -> Counter:
+        responses = await asyncio.gather(
+            *(
+                client.post(f"/drops/{drop_id}/reservations", headers=user_headers())
+                for _ in range(buyers)
+            )
+        )
+        return Counter(r.status_code for r in responses)
+
+    return _stampede
+
+
+def user_headers(user_id: str | None = None) -> dict[str, str]:
+    return {"X-User-Id": user_id or str(uuid4())}
