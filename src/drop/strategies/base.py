@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import StrEnum
-from typing import Protocol
 from uuid import UUID
 
 from psycopg import AsyncConnection
+from psycopg.errors import UniqueViolation
+
+ONE_PER_CUSTOMER_INDEX = "holds_one_live_per_user_idx"
 
 
 class Outcome(StrEnum):
@@ -20,18 +22,40 @@ class ReserveResult:
     expires_at: datetime | None = None
 
 
+SOLD_OUT = ReserveResult(Outcome.SOLD_OUT)
+ALREADY_HOLDING = ReserveResult(Outcome.ALREADY_HOLDING)
+
+
 class DropNotFound(Exception):
     pass
 
 
-class ReservationStrategy(Protocol):
-    """Every strategy answers the same question: can this user have one unit?"""
+class ReservationStrategy:
+    """Every strategy answers the same question: can this user have one unit?
+
+    Subclasses implement `_claim_unit`, the only part that differs. Everything else
+    (the transaction, creating the hold, the one-per-customer rule) is shared, so
+    the benchmark compares the claiming step and nothing else.
+    """
 
     name: str
 
-    async def reserve(
-        self, conn: AsyncConnection, drop_id: UUID, user_id: UUID
-    ) -> ReserveResult: ...
+    async def reserve(self, conn: AsyncConnection, drop_id: UUID, user_id: UUID) -> ReserveResult:
+        try:
+            async with conn.transaction():
+                if not await self._claim_unit(conn, drop_id):
+                    return SOLD_OUT
+                return await create_hold(conn, drop_id, user_id)
+        except UniqueViolation as error:
+            # The buyer already has a live hold. Leaving the transaction block with an
+            # error rolled everything back, including the unit we had just claimed.
+            if error.diag.constraint_name != ONE_PER_CUSTOMER_INDEX:
+                raise
+            return ALREADY_HOLDING
+
+    async def _claim_unit(self, conn: AsyncConnection, drop_id: UUID) -> bool:
+        """Take one unit out of stock. Return False if there is none left."""
+        raise NotImplementedError
 
 
 async def create_hold(conn: AsyncConnection, drop_id: UUID, user_id: UUID) -> ReserveResult:

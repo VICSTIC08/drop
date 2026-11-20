@@ -6,13 +6,15 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from psycopg import AsyncConnection
 
 from drop import config
+from drop.checkout import CheckoutError, checkout
 from drop.db import make_pool
-from drop.schemas import DropCreate, DropOut, HoldOut
+from drop.schemas import DropCreate, DropOut, HoldOut, OrderOut
 from drop.strategies import STRATEGIES
 from drop.strategies.base import DropNotFound, Outcome
 
 DROP_COLUMNS = """
-    d.id, d.name, d.total_units, d.strategy, d.hold_seconds, d.created_at, c.available
+    d.id, d.name, d.total_units, d.strategy, d.hold_seconds, d.price_cents, d.created_at,
+    c.available
 """
 
 
@@ -50,11 +52,17 @@ def create_app(database_url: str | None = None) -> FastAPI:
         async with conn.transaction():
             cur = await conn.execute(
                 """
-                INSERT INTO drops (name, total_units, strategy, hold_seconds)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO drops (name, total_units, strategy, hold_seconds, price_cents)
+                VALUES (%s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (body.name, body.total_units, body.strategy, body.hold_seconds),
+                (
+                    body.name,
+                    body.total_units,
+                    body.strategy,
+                    body.hold_seconds,
+                    body.price_cents,
+                ),
             )
             drop_id = (await cur.fetchone())["id"]
             await conn.execute(
@@ -90,6 +98,31 @@ def create_app(database_url: str | None = None) -> FastAPI:
             user_id=user_id,
             expires_at=result.expires_at,
         )
+
+    @app.post("/reservations/{hold_id}/checkout", status_code=201, response_model=OrderOut)
+    async def checkout_hold(
+        hold_id: UUID,
+        conn: Conn,
+        user_id: Annotated[UUID, Header(alias="X-User-Id")],
+    ):
+        try:
+            return await checkout(conn, hold_id, user_id)
+        except CheckoutError as error:
+            raise HTTPException(error.status_code, error.reason) from None
+
+    @app.get("/orders/{order_id}", response_model=OrderOut)
+    async def get_order(order_id: UUID, conn: Conn):
+        cur = await conn.execute(
+            """
+            SELECT id, hold_id, drop_id, user_id, status, amount_cents, created_at
+            FROM orders WHERE id = %s
+            """,
+            (order_id,),
+        )
+        order = await cur.fetchone()
+        if order is None:
+            raise HTTPException(404, "order not found")
+        return order
 
     return app
 

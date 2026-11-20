@@ -9,6 +9,7 @@ class DropCreate(BaseModel):
     total_units: int = Field(gt=0, le=1_000_000)
     strategy: str = "naive"
     hold_seconds: int = Field(default=120, gt=0, le=3600)
+    price_cents: int = Field(default=1000, ge=0)
 
 
 class DropOut(BaseModel):
@@ -17,6 +18,7 @@ class DropOut(BaseModel):
     total_units: int
     strategy: str
     hold_seconds: int
+    price_cents: int
     available: int
     created_at: datetime
 
@@ -26,3 +28,13 @@ class HoldOut(BaseModel):
     drop_id: UUID
     user_id: UUID
     expires_at: datetime
+
+
+class OrderOut(BaseModel):
+    id: UUID
+    hold_id: UUID
+    drop_id: UUID
+    user_id: UUID
+    status: str
+    amount_cents: int
+    created_at: datetime
