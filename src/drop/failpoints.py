@@ -24,3 +24,11 @@ async def hit(name: str) -> None:
     hook = _hooks.get(name)
     if hook is not None:
         await hook()
+
+
+class Crash(BaseException):
+    """Raised by a test hook to imitate the process dying at this exact line.
+
+    Code under test must let it pass straight through without cleaning up,
+    because a process that was killed does not get to clean up either.
+    """

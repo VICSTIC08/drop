@@ -1,0 +1,454 @@
+{
+  "experiment": "throughput",
+  "settings": {
+    "units": 2000,
+    "buyers": 2000,
+    "vus": 50
+  },
+  "repeats": 5,
+  "started_at_utc": "20261120-220209",
+  "environment": {
+    "machine": "arm64",
+    "system": "Darwin 25.5.0",
+    "cpu_count": 8,
+    "python": "3.12.16",
+    "postgres": "18.7 (Debian 18.7-1.pgdg13+5)",
+    "k6": "k6 v2.4.0 (commit/devel, go1.27.4, darwin/arm64)",
+    "git_commit": "025d2fd",
+    "git_dirty": true,
+    "db_pool_max_size": 10,
+    "note": "load generator, API and database all share this one machine"
+  },
+  "runs": [
+    {
+      "strategy": "naive",
+      "repeat": 1,
+      "drop_id": "4668cd70-4d35-4d6b-9862-d5005b1081e9",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 1804,
+      "violations": [
+        "I3 conservation: 2000 live holds + 1804 available != 2000 units"
+      ],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 1452.6184900902367,
+      "latency_ms": {
+        "p50": 28.390500000000003,
+        "p95": 67.84129999999998,
+        "p99": 128.41179,
+        "max": 171.335
+      }
+    },
+    {
+      "strategy": "naive",
+      "repeat": 2,
+      "drop_id": "03591cb9-adad-42f3-810a-bda00e250a81",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 1781,
+      "violations": [
+        "I3 conservation: 2000 live holds + 1781 available != 2000 units"
+      ],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 1447.3047206014419,
+      "latency_ms": {
+        "p50": 23.819,
+        "p95": 39.25355,
+        "p99": 379.25018,
+        "max": 411.298
+      }
+    },
+    {
+      "strategy": "naive",
+      "repeat": 3,
+      "drop_id": "2a0d546a-b8de-4af1-a73f-e475131f44da",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 1783,
+      "violations": [
+        "I3 conservation: 2000 live holds + 1783 available != 2000 units"
+      ],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 1511.5067228040264,
+      "latency_ms": {
+        "p50": 25.744500000000002,
+        "p95": 85.35939999999998,
+        "p99": 107.67537999999999,
+        "max": 138.319
+      }
+    },
+    {
+      "strategy": "naive",
+      "repeat": 4,
+      "drop_id": "94692224-4586-4f4b-a08f-b9f646ab2005",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 1788,
+      "violations": [
+        "I3 conservation: 2000 live holds + 1788 available != 2000 units"
+      ],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 1900.629393423632,
+      "latency_ms": {
+        "p50": 24.7055,
+        "p95": 35.7515,
+        "p99": 43.07803,
+        "max": 58.314
+      }
+    },
+    {
+      "strategy": "naive",
+      "repeat": 5,
+      "drop_id": "74bd31e0-62ad-42ad-bc4e-7146f232ece4",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 1805,
+      "violations": [
+        "I3 conservation: 2000 live holds + 1805 available != 2000 units"
+      ],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 1836.8795824405333,
+      "latency_ms": {
+        "p50": 24.459,
+        "p95": 37.206149999999994,
+        "p99": 84.16268000000001,
+        "max": 102.587
+      }
+    },
+    {
+      "strategy": "row_lock",
+      "repeat": 1,
+      "drop_id": "2161f893-c3ce-4867-b796-64111cc7f111",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 1677.54132832755,
+      "latency_ms": {
+        "p50": 25.289,
+        "p95": 37.61554999999999,
+        "p99": 122.58695999999985,
+        "max": 574.115
+      }
+    },
+    {
+      "strategy": "row_lock",
+      "repeat": 2,
+      "drop_id": "47e7364c-5dc5-4990-9ff3-ae7c4e2e7ac2",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 1658.0709505140435,
+      "latency_ms": {
+        "p50": 25.448,
+        "p95": 35.43334999999995,
+        "p99": 142.81880999999993,
+        "max": 400
+      }
+    },
+    {
+      "strategy": "row_lock",
+      "repeat": 3,
+      "drop_id": "c402c417-7690-48bd-8277-607f369c731b",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 1390.6774546152412,
+      "latency_ms": {
+        "p50": 28.076,
+        "p95": 73.61445,
+        "p99": 143.69132999999994,
+        "max": 329.49
+      }
+    },
+    {
+      "strategy": "row_lock",
+      "repeat": 4,
+      "drop_id": "0ce80e5a-6db9-4cd7-8080-2f5bf68dfccb",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 1589.6140973336608,
+      "latency_ms": {
+        "p50": 26.0815,
+        "p95": 37.87269999999999,
+        "p99": 119.9415999999999,
+        "max": 717.088
+      }
+    },
+    {
+      "strategy": "row_lock",
+      "repeat": 5,
+      "drop_id": "cd5e3e47-e561-4ef3-8667-2de4f0dcebaa",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 1421.6894362077287,
+      "latency_ms": {
+        "p50": 28.4665,
+        "p95": 53.79589999999998,
+        "p99": 123.83751999999993,
+        "max": 652.072
+      }
+    },
+    {
+      "strategy": "atomic_update",
+      "repeat": 1,
+      "drop_id": "058e912f-436d-432c-b942-6484ebf414e4",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 2133.6656161919614,
+      "latency_ms": {
+        "p50": 21.881,
+        "p95": 31.24045,
+        "p99": 37.50925,
+        "max": 47.67
+      }
+    },
+    {
+      "strategy": "atomic_update",
+      "repeat": 2,
+      "drop_id": "4889197b-cd12-426d-a6ae-d0eba6ea96b5",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 2151.347281234873,
+      "latency_ms": {
+        "p50": 21.9585,
+        "p95": 29.725849999999994,
+        "p99": 35.883109999999995,
+        "max": 42.037
+      }
+    },
+    {
+      "strategy": "atomic_update",
+      "repeat": 3,
+      "drop_id": "0118c699-8bb1-46e5-bd63-92d3bbf33bab",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 2087.891897309125,
+      "latency_ms": {
+        "p50": 22.487000000000002,
+        "p95": 32.1003,
+        "p99": 38.58835,
+        "max": 51.901
+      }
+    },
+    {
+      "strategy": "atomic_update",
+      "repeat": 4,
+      "drop_id": "9a063888-93cf-4dcc-a054-3cc9dd673fa4",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 2167.8383833128473,
+      "latency_ms": {
+        "p50": 21.8405,
+        "p95": 29.891299999999994,
+        "p99": 34.67388999999999,
+        "max": 44.64
+      }
+    },
+    {
+      "strategy": "atomic_update",
+      "repeat": 5,
+      "drop_id": "2aa6d6d4-e666-4d7e-a5d5-ff66f2de2503",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 2138.996254617558,
+      "latency_ms": {
+        "p50": 21.8585,
+        "p95": 30.800999999999995,
+        "p99": 37.20527,
+        "max": 46.967
+      }
+    },
+    {
+      "strategy": "redis_counter",
+      "repeat": 1,
+      "drop_id": "22c2c419-9163-4f3b-8940-2814dfc65e62",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 3392.9301514434374,
+      "latency_ms": {
+        "p50": 13.583,
+        "p95": 25.047449999999998,
+        "p99": 29.30652,
+        "max": 38.451
+      }
+    },
+    {
+      "strategy": "redis_counter",
+      "repeat": 2,
+      "drop_id": "6eeb4af1-dcee-4d44-b336-4679ed7f57bb",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 3682.0884805861883,
+      "latency_ms": {
+        "p50": 12.962499999999999,
+        "p95": 14.931049999999997,
+        "p99": 26.48459,
+        "max": 34.717
+      }
+    },
+    {
+      "strategy": "redis_counter",
+      "repeat": 3,
+      "drop_id": "d9bab33b-2fea-4ed6-9513-0af5ad77a385",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 3630.877710223281,
+      "latency_ms": {
+        "p50": 13.1295,
+        "p95": 16.5341,
+        "p99": 23.82547999999997,
+        "max": 37.011
+      }
+    },
+    {
+      "strategy": "redis_counter",
+      "repeat": 4,
+      "drop_id": "a8df8797-2f43-4c07-8392-df6171887998",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 3397.500798412688,
+      "latency_ms": {
+        "p50": 13.632,
+        "p95": 22.118699999999997,
+        "p99": 29.87304,
+        "max": 31.915
+      }
+    },
+    {
+      "strategy": "redis_counter",
+      "repeat": 5,
+      "drop_id": "09b12a06-7d10-4cb5-9cc3-adb69e270807",
+      "units": 2000,
+      "buyers": 2000,
+      "sold": 2000,
+      "oversold": 0,
+      "available_after": 0,
+      "violations": [],
+      "responses_held": 2000,
+      "responses_sold_out": 0,
+      "responses_unexpected": 0,
+      "requests_per_second": 3730.960442491909,
+      "latency_ms": {
+        "p50": 12.927,
+        "p95": 14.586799999999998,
+        "p99": 22.973969999999998,
+        "max": 32.758
+      }
+    }
+  ]
+}

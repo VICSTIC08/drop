@@ -6,7 +6,7 @@ import pytest
 
 from conftest import user_headers
 from drop import failpoints
-from drop.strategies import SAFE_STRATEGIES, STRATEGIES
+from drop.strategies import SAFE_STRATEGIES, STRATEGY_NAMES
 from drop.verify import verify_drop
 
 
@@ -62,7 +62,7 @@ async def test_safe_strategies_sell_exactly_the_stock(client, make_drop, stamped
     assert report.live_holds == 10
 
 
-@pytest.mark.parametrize("strategy", sorted(STRATEGIES))
+@pytest.mark.parametrize("strategy", sorted(STRATEGY_NAMES))
 async def test_same_buyer_clicking_many_times_gets_one_unit(client, make_drop, db, strategy):
     drop = await make_drop(total_units=10, strategy=strategy)
     buyer = user_headers()
