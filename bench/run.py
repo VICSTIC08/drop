@@ -34,6 +34,10 @@ PORT = 8010
 BASE_URL = f"http://127.0.0.1:{PORT}"
 DEFAULT_POOL = 10
 
+# Files the benchmark itself produces. They must not count as "uncommitted code
+# changes", otherwise the first run makes every later run look dirty.
+GENERATED = [":(exclude)bench/results", ":(exclude)figures", ":(exclude)README.md"]
+
 # burst:      far more buyers than units, the flash-sale moment. "Does it oversell?"
 # throughput: a unit for every buyer, so every request does the full work of reserving.
 #             "How fast is the reserve path, and how bad is the tail?"
@@ -85,7 +89,7 @@ def environment() -> dict:
         "postgres": postgres,
         "k6": sh("k6", "version"),
         "git_commit": sh("git", "rev-parse", "--short", "HEAD") or "unknown",
-        "git_dirty": bool(sh("git", "status", "--porcelain")),
+        "git_dirty": bool(sh("git", "status", "--porcelain", "--", ".", *GENERATED)),
         "note": "load generator, API and database all share this one machine",
     }
 
