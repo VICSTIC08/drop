@@ -1,12 +1,14 @@
 """Run a benchmark experiment and save the raw results as JSON.
 
-For each strategy and each repeat it creates a fresh drop, lets k6 send the
-buyers over real HTTP, then asks `verify` to judge the final database state.
-Nothing here is rounded or summarised: bench/table.py does that from the file.
+For each strategy, each variant and each repeat it creates a fresh drop, lets k6
+send the buyers over real HTTP, then asks `verify` to judge the final database
+state. Nothing here is rounded or summarised: bench/table.py does that from the file.
 
 Usage:
     uv run python bench/run.py burst
-    uv run python bench/run.py throughput --repeats 5
+    uv run python bench/run.py throughput
+    uv run python bench/run.py sweep
+    uv run python bench/run.py pool
 """
 
 import argparse
@@ -24,19 +26,47 @@ import httpx
 import psycopg
 
 from drop import config
-from drop.strategies import STRATEGY_NAMES
+from drop.strategies import SAFE_STRATEGIES, STRATEGY_NAMES
 from drop.verify import verify_drop
 
 ROOT = Path(__file__).resolve().parents[1]
 PORT = 8010
 BASE_URL = f"http://127.0.0.1:{PORT}"
+DEFAULT_POOL = 10
 
-# burst: far more buyers than units, the flash-sale moment. Answers "does it oversell?"
-# throughput: a unit for every buyer, so every request does the full work of
-#             reserving. Answers "how fast is the reserve path, and how bad is the tail?"
+# burst:      far more buyers than units, the flash-sale moment. "Does it oversell?"
+# throughput: a unit for every buyer, so every request does the full work of reserving.
+#             "How fast is the reserve path, and how bad is the tail?"
+# sweep:      throughput again at rising concurrency. "How does each strategy degrade
+#             as more buyers arrive at once?"
+# pool:       the burst again with different database connection pool sizes.
+#             "Is the bottleneck the query, or waiting for a connection?"
 EXPERIMENTS = {
-    "burst": {"units": 100, "buyers": 1000, "vus": 200},
-    "throughput": {"units": 2000, "buyers": 2000, "vus": 50},
+    "burst": {
+        "repeats": 5,
+        "strategies": STRATEGY_NAMES,
+        "variants": [{"units": 100, "buyers": 1000, "vus": 200, "pool": DEFAULT_POOL}],
+    },
+    "throughput": {
+        "repeats": 5,
+        "strategies": STRATEGY_NAMES,
+        "variants": [{"units": 2000, "buyers": 2000, "vus": 50, "pool": DEFAULT_POOL}],
+    },
+    "sweep": {
+        "repeats": 3,
+        "strategies": STRATEGY_NAMES,
+        "variants": [
+            {"units": 2000, "buyers": 2000, "vus": vus, "pool": DEFAULT_POOL}
+            for vus in (10, 25, 50, 100, 200)
+        ],
+    },
+    "pool": {
+        "repeats": 3,
+        "strategies": SAFE_STRATEGIES,
+        "variants": [
+            {"units": 100, "buyers": 1000, "vus": 200, "pool": pool} for pool in (5, 10, 20, 40)
+        ],
+    },
 }
 
 
@@ -56,16 +86,18 @@ def environment() -> dict:
         "k6": sh("k6", "version"),
         "git_commit": sh("git", "rev-parse", "--short", "HEAD") or "unknown",
         "git_dirty": bool(sh("git", "status", "--porcelain")),
-        "db_pool_max_size": config.pool_max_size(),
         "note": "load generator, API and database all share this one machine",
     }
 
 
-def start_server() -> subprocess.Popen:
+def start_server(pool: int) -> subprocess.Popen:
+    # The background sweeper is off so it cannot disturb the timings.
+    env = {**os.environ, "DB_POOL_MAX_SIZE": str(pool), "SWEEP_INTERVAL_SECONDS": "0"}
     server = subprocess.Popen(
         [sys.executable, "-m", "uvicorn", "drop.main:app", "--port", str(PORT)]
         + ["--log-level", "warning"],
         cwd=ROOT,
+        env=env,
     )
     for _ in range(100):
         try:
@@ -82,7 +114,7 @@ def run_once(strategy: str, units: int, buyers: int, vus: int) -> dict:
     drop = httpx.post(
         f"{BASE_URL}/drops",
         json={"name": f"bench-{strategy}", "total_units": units, "strategy": strategy},
-        timeout=30,
+        timeout=60,
     )
     drop.raise_for_status()
     drop_id = drop.json()["id"]
@@ -110,8 +142,6 @@ def run_once(strategy: str, units: int, buyers: int, vus: int) -> dict:
     latency = metrics["http_req_duration"]["values"]
     return {
         "drop_id": drop_id,
-        "units": units,
-        "buyers": buyers,
         "sold": report.live_holds,
         "oversold": report.oversold,
         "available_after": report.available,
@@ -132,40 +162,47 @@ def run_once(strategy: str, units: int, buyers: int, vus: int) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("experiment", choices=sorted(EXPERIMENTS))
-    parser.add_argument("--repeats", type=int, default=5)
-    parser.add_argument("--strategies", nargs="*", default=STRATEGY_NAMES)
+    parser.add_argument("--repeats", type=int)
+    parser.add_argument("--strategies", nargs="*")
     args = parser.parse_args()
-    settings = EXPERIMENTS[args.experiment]
+    plan = EXPERIMENTS[args.experiment]
+    repeats = args.repeats or plan["repeats"]
+    strategies = args.strategies or plan["strategies"]
 
     env = environment()
     stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     out_dir = ROOT / "bench" / "results" / f"{stamp}-{env['git_commit']}"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    server = start_server()
     runs = []
-    try:
-        for strategy in args.strategies:
-            for repeat in range(1, args.repeats + 1):
-                result = run_once(strategy, **settings)
-                runs.append({"strategy": strategy, "repeat": repeat, **result})
-                print(
-                    f"{strategy:<14} run {repeat}: sold {result['sold']:>5} "
-                    f"oversold {result['oversold']:>4}  "
-                    f"{result['requests_per_second']:>7.0f} req/s  "
-                    f"p99 {result['latency_ms']['p99']:>7.1f} ms"
-                )
-    finally:
-        server.terminate()
-        server.wait(timeout=10)
+    for pool in sorted({variant["pool"] for variant in plan["variants"]}):
+        server = start_server(pool)
+        try:
+            for variant in (v for v in plan["variants"] if v["pool"] == pool):
+                for strategy in strategies:
+                    for repeat in range(1, repeats + 1):
+                        result = run_once(
+                            strategy, variant["units"], variant["buyers"], variant["vus"]
+                        )
+                        runs.append({"strategy": strategy, "repeat": repeat, **variant, **result})
+                        print(
+                            f"{strategy:<14} {variant['vus']:>3} at a time, pool {pool:>2}, "
+                            f"run {repeat}: sold {result['sold']:>5} "
+                            f"oversold {result['oversold']:>4} "
+                            f"{result['requests_per_second']:>7.0f} req/s  "
+                            f"p99 {result['latency_ms']['p99']:>7.1f} ms"
+                        )
+        finally:
+            server.terminate()
+            server.wait(timeout=10)
 
     out_file = out_dir / f"{args.experiment}.json"
     out_file.write_text(
         json.dumps(
             {
                 "experiment": args.experiment,
-                "settings": settings,
-                "repeats": args.repeats,
+                "variants": plan["variants"],
+                "repeats": repeats,
                 "started_at_utc": stamp,
                 "environment": env,
                 "runs": runs,
@@ -175,6 +212,8 @@ def main() -> None:
         + "\n"
     )
     print(f"\nsaved {out_file.relative_to(ROOT)}")
+    if env["git_dirty"]:
+        print("note: uncommitted changes were present, so this run is not tied to one commit")
 
 
 if __name__ == "__main__":
