@@ -44,7 +44,11 @@ def verify_drop(conn: psycopg.Connection, drop_id: UUID | str) -> VerifyReport:
         SELECT
             d.strategy,
             d.total_units,
-            c.available,
+            CASE WHEN d.strategy = 'unit_rows'
+                 THEN (SELECT count(*) FROM inventory_units u
+                       WHERE u.drop_id = d.id AND u.hold_id IS NULL)
+                 ELSE c.available
+            END AS available,
             (SELECT count(*) FROM holds h
               WHERE h.drop_id = d.id AND h.status = ANY(%(live)s)) AS live_holds,
             (SELECT count(*) FROM holds h

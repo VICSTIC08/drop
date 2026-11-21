@@ -46,7 +46,7 @@ def database_url() -> str:
 def db(database_url):
     """A direct connection for assertions, with every table emptied before the test."""
     with psycopg.connect(database_url, autocommit=True) as conn:
-        conn.execute("TRUNCATE orders, holds, inventory_counters, drops CASCADE")
+        conn.execute("TRUNCATE orders, inventory_units, holds, inventory_counters, drops CASCADE")
         yield conn
 
 
@@ -66,11 +66,17 @@ def no_leftover_failpoints():
 
 @pytest.fixture
 async def client(database_url, db, cache):
-    app = create_app(database_url, TEST_REDIS_URL)
+    app = create_app(database_url, TEST_REDIS_URL, sweep_interval=0)
     async with app.router.lifespan_context(app):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as c:
             yield c
+
+
+@pytest.fixture
+def app_state(client):
+    """The running app's pool and strategies, for tests that call internals directly."""
+    return client._transport.app.state
 
 
 @pytest.fixture
