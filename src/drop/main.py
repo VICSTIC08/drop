@@ -1,4 +1,5 @@
-from contextlib import asynccontextmanager
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from typing import Annotated
 from uuid import UUID
 
@@ -13,10 +14,15 @@ from drop.schemas import DropCreate, DropOut, HoldOut, OrderOut
 from drop.strategies import STRATEGY_NAMES, build_strategies
 from drop.strategies.base import DropNotFound, Outcome
 from drop.strategies.redis_counter import stock_key
+from drop.sweeper import sweep_forever
 
 DROP_COLUMNS = """
     d.id, d.name, d.total_units, d.strategy, d.hold_seconds, d.price_cents, d.created_at,
-    c.available
+    CASE WHEN d.strategy = 'unit_rows'
+         THEN (SELECT count(*) FROM inventory_units u
+               WHERE u.drop_id = d.id AND u.hold_id IS NULL)
+         ELSE c.available
+    END AS available
 """
 
 
@@ -29,9 +35,14 @@ async def get_conn(request: Request):
 Conn = Annotated[AsyncConnection, Depends(get_conn)]
 
 
-def create_app(database_url: str | None = None, redis_url: str | None = None) -> FastAPI:
+def create_app(
+    database_url: str | None = None,
+    redis_url: str | None = None,
+    sweep_interval: float | None = None,
+) -> FastAPI:
     url = database_url or config.database_url()
     cache_url = redis_url or config.redis_url()
+    interval = config.sweep_interval_seconds() if sweep_interval is None else sweep_interval
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -44,7 +55,14 @@ def create_app(database_url: str | None = None, redis_url: str | None = None) ->
         # A drop's strategy never changes, so remember it instead of asking Postgres
         # on every single reservation.
         app.state.strategy_of_drop = {}
+        sweeper = None
+        if interval > 0:
+            sweeper = asyncio.create_task(sweep_forever(pool, app.state.strategies, interval))
         yield
+        if sweeper is not None:
+            sweeper.cancel()
+            with suppress(asyncio.CancelledError):
+                await sweeper
         await redis.aclose()
         await pool.close()
 
@@ -79,6 +97,14 @@ def create_app(database_url: str | None = None, redis_url: str | None = None) ->
                 "INSERT INTO inventory_counters (drop_id, available) VALUES (%s, %s)",
                 (drop_id, body.total_units),
             )
+            if body.strategy == "unit_rows":
+                await conn.execute(
+                    """
+                    INSERT INTO inventory_units (drop_id, unit_no)
+                    SELECT %s, generate_series(1, %s)
+                    """,
+                    (drop_id, body.total_units),
+                )
         strategy = request.app.state.strategies[body.strategy]
         await strategy.on_drop_created(drop_id, body.total_units)
         return await _load_drop(conn, request.app.state.redis, drop_id)

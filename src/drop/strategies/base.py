@@ -43,9 +43,7 @@ class ReservationStrategy:
     async def reserve(self, conn: AsyncConnection, drop_id: UUID, user_id: UUID) -> ReserveResult:
         try:
             async with conn.transaction():
-                if not await self._claim_unit(conn, drop_id):
-                    return SOLD_OUT
-                return await create_hold(conn, drop_id, user_id)
+                return await self._reserve_in_transaction(conn, drop_id, user_id)
         except UniqueViolation as error:
             # The buyer already has a live hold. Leaving the transaction block with an
             # error rolled everything back, including the unit we had just claimed.
@@ -53,12 +51,34 @@ class ReservationStrategy:
                 raise
             return ALREADY_HOLDING
 
+    async def _reserve_in_transaction(
+        self, conn: AsyncConnection, drop_id: UUID, user_id: UUID
+    ) -> ReserveResult:
+        if not await self._claim_unit(conn, drop_id):
+            return SOLD_OUT
+        return await create_hold(conn, drop_id, user_id)
+
     async def _claim_unit(self, conn: AsyncConnection, drop_id: UUID) -> bool:
         """Take one unit out of stock. Return False if there is none left."""
         raise NotImplementedError
 
     async def on_drop_created(self, drop_id: UUID, total_units: int) -> None:
         """Called once after a drop using this strategy is created. Most need nothing."""
+        return None
+
+    async def release(self, conn: AsyncConnection, drop_id: UUID, hold_id: UUID) -> None:
+        """Put one unit back in stock, inside the caller's transaction.
+
+        The default suits the counter strategies. Adding 1 in a single statement is
+        safe under concurrency for the same reason atomic_update is.
+        """
+        await conn.execute(
+            "UPDATE inventory_counters SET available = available + 1 WHERE drop_id = %s",
+            (drop_id,),
+        )
+
+    async def after_release_committed(self, drop_id: UUID, units: int) -> None:
+        """Called after the release transaction has committed. Most need nothing."""
         return None
 
 

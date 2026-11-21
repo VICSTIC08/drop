@@ -73,6 +73,15 @@ class RedisCounterStrategy(ReservationStrategy):
     async def on_drop_created(self, drop_id: UUID, total_units: int) -> None:
         await self.redis.set(stock_key(drop_id), total_units)
 
+    async def release(self, conn: AsyncConnection, drop_id: UUID, hold_id: UUID) -> None:
+        # Nothing to undo in Postgres: this strategy's stock number is in Redis.
+        return None
+
+    async def after_release_committed(self, drop_id: UUID, units: int) -> None:
+        # Second half of a dual write. If the process dies right here the units stay
+        # missing from Redis until `reconcile` runs.
+        await self.redis.incrby(stock_key(drop_id), units)
+
     async def _rebuild_counter(self, conn: AsyncConnection, drop_id: UUID) -> None:
         """Redis lost the counter (restart, eviction). Postgres is the source of truth."""
         cur = await conn.execute(
