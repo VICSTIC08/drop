@@ -17,9 +17,85 @@ below is generated from the raw benchmark files in `bench/results/`.
 ## Results
 
 <!-- results:start -->
+**Burst (the flash-sale moment)**: 100 units, 1000 buyers, 200 at a time, pool of 10 connections.
+
+| Strategy | Sold (min–max) | Oversold (min–max) | Runs breaking a rule | Requests/s | p50 ms | p99 ms |
+|---|---|---|---|---|---|---|
+| `naive` | 986–996 | 886–896 | 5 of 5 | 1034 | 112.0 | 292.2 |
+| `row_lock` | 100–100 | 0–0 | 0 of 5 | 2239 | 65.3 | 118.3 |
+| `atomic_update` | 100–100 | 0–0 | 0 of 5 | 3811 | 38.8 | 85.4 |
+| `redis_counter` | 100–100 | 0–0 | 0 of 5 | 4413 | 30.9 | 125.1 |
+| `unit_rows` | 100–100 | 0–0 | 0 of 5 | 4090 | 38.1 | 103.9 |
+
+5 runs per row, median shown. Commit `895ebbe`, Darwin 25.5.0 arm64, 8 CPUs, PostgreSQL 18.7 (Debian 18.7-1.pgdg13+5). Raw data: `bench/results/20261121-004951-895ebbe/burst.json`.
+
+**Throughput (a unit for every buyer)**: 2000 units, 2000 buyers, 50 at a time, pool of 10 connections.
+
+| Strategy | Sold (min–max) | Oversold (min–max) | Runs breaking a rule | Requests/s | p50 ms | p99 ms |
+|---|---|---|---|---|---|---|
+| `naive` | 2000–2000 | 0–0 | 5 of 5 | 1607 | 24.6 | 88.9 |
+| `row_lock` | 2000–2000 | 0–0 | 0 of 5 | 1529 | 27.3 | 117.1 |
+| `atomic_update` | 2000–2000 | 0–0 | 0 of 5 | 1978 | 23.7 | 40.6 |
+| `redis_counter` | 2000–2000 | 0–0 | 0 of 5 | 3538 | 13.3 | 25.2 |
+| `unit_rows` | 2000–2000 | 0–0 | 0 of 5 | 3142 | 15.2 | 29.0 |
+
+5 runs per row, median shown. Commit `895ebbe`, Darwin 25.5.0 arm64, 8 CPUs, PostgreSQL 18.7 (Debian 18.7-1.pgdg13+5). Raw data: `bench/results/20261121-005345-895ebbe/throughput.json`.
+
+**Rising concurrency: 2000 units, 2000 buyers, pool of 10.** Each cell: requests/s, then p99 in ms.
+
+| Strategy | at a time: 10 | at a time: 25 | at a time: 50 | at a time: 100 | at a time: 200 |
+|---|---|---|---|---|---|
+| `naive` | 1903 / 20.8 | 1991 / 26.8 | 1993 / 39.7 | 1792 / 72.7 | 1940 / 118.1 |
+| `row_lock` | 1517 / 74.4 | 1715 / 120.6 | 1687 / 141.6 | 1386 / 172.4 | 1633 / 211.3 |
+| `atomic_update` | 2180 / 17.5 | 2099 / 25.3 | 2058 / 37.8 | 1968 / 70.7 | 2071 / 108.1 |
+| `redis_counter` | 3819 / 4.0 | 3708 / 16.5 | 3677 / 23.5 | 3404 / 60.7 | 3303 / 97.5 |
+| `unit_rows` | 3445 / 5.4 | 3304 / 16.1 | 3058 / 27.3 | 2973 / 53.7 | 2990 / 97.7 |
+
+3 runs per row, median shown. Commit `895ebbe`, Darwin 25.5.0 arm64, 8 CPUs, PostgreSQL 18.7 (Debian 18.7-1.pgdg13+5). Raw data: `bench/results/20261121-005711-895ebbe/sweep.json`.
+
+**Connection pool size: 100 units, 1000 buyers, 200 at a time.** Each cell: requests/s, then p99 in ms.
+
+| Strategy | pool of 5 | pool of 10 | pool of 20 | pool of 40 |
+|---|---|---|---|---|
+| `row_lock` | 2232 / 133.2 | 2042 / 154.2 | 2458 / 124.8 | 2489 / 132.4 |
+| `atomic_update` | 3520 / 84.6 | 3835 / 97.0 | 3745 / 97.7 | 3609 / 116.3 |
+| `redis_counter` | 4722 / 71.8 | 4466 / 118.7 | 4883 / 175.7 | 5156 / 163.3 |
+| `unit_rows` | 3763 / 82.1 | 4113 / 109.3 | 4050 / 155.6 | 3669 / 229.2 |
+
+3 runs per row, median shown. Commit `895ebbe`, Darwin 25.5.0 arm64, 8 CPUs, PostgreSQL 18.7 (Debian 18.7-1.pgdg13+5). Raw data: `bench/results/20261121-010047-895ebbe/pool.json`.
 <!-- results:end -->
 
-<!-- findings -->
+![p99 latency against concurrency for each strategy](figures/p99_vs_concurrency.png)
+
+### What the numbers show
+
+- **The naive strategy oversold in every run.** With 100 units and 1,000 buyers
+  it sold 986 to 996 units, in 5 of 5 runs. The four safe strategies sold
+  exactly 100 in 5 of 5 runs each.
+- **A naive strategy can also be wrong without overselling.** In the throughput
+  test, where there is a unit for every buyer, it sold the right number but
+  broke the conservation rule in 5 of 5 runs: its stock counter no longer
+  matched what had been sold.
+- **One row per unit beat the single row lock.** `unit_rows` handled about twice
+  the requests per second of `row_lock` (3,142 against 1,529) with a p99 about a
+  quarter as long (29.0 ms against 117.1 ms). `row_lock` had the worst p99 at
+  every concurrency level, from 74.4 ms at 10 buyers at a time to 211.3 ms at 200.
+- **Keeping everything in PostgreSQL cost little against Redis.** `unit_rows`
+  reached 89% of the throughput of `redis_counter` (3,142 against 3,538
+  requests/s), and at 200 buyers at a time their p99 was the same within noise
+  (97.7 ms and 97.5 ms). `unit_rows` gets there without writing to two systems.
+- **The simplest correct strategy had the best tail in the burst.**
+  `atomic_update`, one SQL statement, had the lowest burst p99 (85.4 ms).
+  `redis_counter` answered the most requests per second (4,413) but its p99 was
+  125.1 ms.
+- **A bigger connection pool did not help, and made the tail worse.** I expected
+  the Redis tail to come from requests waiting for one of 10 database
+  connections. The pool test contradicts that: going from 5 to 40 connections
+  left throughput roughly flat and raised p99 for `redis_counter` (71.8 ms to
+  163.3 ms) and `unit_rows` (82.1 ms to 229.2 ms). One explanation consistent
+  with this is that more connections mean more work competing for the same 8
+  CPUs, which the load generator also shares. This test does not prove that
+  cause; it has 3 runs per cell and the runs are noisy.
 
 ## The five strategies
 
